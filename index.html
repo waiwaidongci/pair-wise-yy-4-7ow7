@@ -3,152 +3,587 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>水下考古潜水记录</title>
+  <title>水下考古测线重叠与拼图准入台</title>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: Arial, "PingFang SC", sans-serif; background: #e8f2f3; color: #183035; }
     header { padding: 18px 24px; background: #fff; border-bottom: 1px solid #c9dadc; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
-    h1 { margin: 0; font-size: 26px; }
-    button { border: 0; border-radius: 8px; padding: 10px 13px; background: #1d6c78; color: #fff; font-weight: 800; cursor: pointer; }
+    h1 { margin: 0 0 4px; font-size: 24px; }
+    h2 { font-size: 15px; margin: 18px 0 8px; }
+    button { border: 0; border-radius: 8px; padding: 9px 13px; background: #1d6c78; color: #fff; font-weight: 800; cursor: pointer; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
     button.secondary { background: #64777b; }
-    input, select, textarea { width: 100%; border: 1px solid #c9dadc; border-radius: 6px; padding: 9px; font: inherit; background: #fff; }
-    textarea { min-height: 64px; }
-    label { display: block; margin: 9px 0 5px; color: #5c7378; font-size: 13px; }
-    .app { display: grid; grid-template-columns: 1fr 360px; gap: 16px; padding: 16px; }
+    button.danger { background: #a23b32; }
+    button.ghost { background: #dfecee; color: #1d6c78; }
+    input, select, textarea { width: 100%; border: 1px solid #c9dadc; border-radius: 6px; padding: 8px; font: inherit; background: #fff; }
+    input:disabled, textarea:disabled { background: #eef3f4; color: #5c7378; }
+    label { display: block; margin: 8px 0 4px; color: #5c7378; font-size: 12px; }
+    .app { display: grid; grid-template-columns: minmax(0,1fr) 400px; gap: 16px; padding: 16px; align-items: start; }
     .panel { background: #fff; border: 1px solid #c9dadc; border-radius: 8px; padding: 14px; }
-    .map { position: relative; height: calc(100vh - 128px); min-height: 560px; overflow: hidden; background: radial-gradient(circle at 30% 20%, #5fa8b1, #0f5262 55%, #07333f); border-radius: 8px; border: 1px solid #0c4451; cursor: crosshair; }
-    .wreck { position: absolute; left: 24%; top: 28%; width: 52%; height: 31%; border: 3px solid rgba(220,235,224,.55); border-radius: 48% 44% 42% 50%; transform: rotate(-9deg); }
-    .rib { position: absolute; width: 2px; height: 36%; background: rgba(220,235,224,.35); top: 27%; transform: rotate(-9deg); }
-    .marker { position: absolute; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 800; transform: translate(-50%, -50%); border: 2px solid rgba(255,255,255,.7); box-shadow: 0 4px 12px rgba(0,0,0,.35); cursor: pointer; }
-    .marker.selected { outline: 4px solid rgba(255,234,124,.75); }
-    .ceramic { background: #b56c38; } .wood { background: #6c4b2f; } .metal { background: #6e7880; } .unknown { background: #725ca6; }
-    .toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-    .list { display: grid; gap: 8px; max-height: 330px; overflow: auto; }
-    .item { border: 1px solid #d7e4e5; border-radius: 8px; padding: 10px; cursor: pointer; }
-    .item.active { border-color: #1d6c78; background: #eef8f9; }
-    .timeline { display: grid; gap: 8px; max-height: 240px; overflow: auto; }
-    .pill { display: inline-block; padding: 3px 8px; border: 1px solid #c9dadc; border-radius: 999px; font-size: 12px; }
+    .maphead { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .mapwrap { display: flex; justify-content: center; }
+    .map { position: relative; width: 100%; max-width: calc(100vh - 190px); aspect-ratio: 1 / 1; overflow: hidden; background: radial-gradient(circle at 30% 20%, #5fa8b1, #0f5262 55%, #07333f); border-radius: 8px; border: 1px solid #0c4451; }
+    .map.armed { outline: 3px dashed #ffea7c; }
+    .wreck { position: absolute; left: 24%; top: 28%; width: 52%; height: 31%; border: 3px solid rgba(220,235,224,.35); border-radius: 48% 44% 42% 50%; transform: rotate(-9deg); }
+    .rib { position: absolute; width: 2px; height: 36%; background: rgba(220,235,224,.22); top: 27%; transform: rotate(-9deg); }
+    .survey-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .swath-ok { fill: rgba(126, 196, 202, .28); stroke: rgba(207, 238, 240, .8); stroke-width: .35; }
+    .swath-bad { fill: rgba(192, 69, 58, .17); stroke: rgba(224, 120, 110, .85); stroke-width: .35; }
+    .line-group { cursor: pointer; }
+    .line-group .track { stroke: rgba(16, 48, 58, .85); stroke-width: .55; }
+    .line-group.selected .track { stroke: #ffea7c; stroke-width: 1; }
+    .line-group.selected .swath-ok, .line-group.selected .swath-bad { stroke: #ffea7c; stroke-width: .7; }
+    .endpoint.start { fill: #eaf6f7; stroke: #183035; stroke-width: .35; }
+    .endpoint.end { fill: #ffd97a; stroke: #183035; stroke-width: .35; }
+    .ep-text { fill: rgba(255,255,255,.92); font-weight: 700; paint-order: stroke; stroke: rgba(0,0,0,.45); stroke-width: .6; }
+    .code-bg { fill: rgba(255,255,255,.92); }
+    .code-text { fill: #183035; font-weight: 700; }
+    .draft-line { stroke: #ffea7c; stroke-width: .6; stroke-dasharray: 2 1.4; }
+    .draft-point { fill: #ffea7c; stroke: #183035; stroke-width: .3; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #5c7378; }
+    .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
     .muted { color: #5c7378; font-size: 13px; }
-    @media (max-width: 980px) { header { display: block; } .app { grid-template-columns: 1fr; } .map { height: 560px; } }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+    .form-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .form-errors { color: #a23b32; font-size: 13px; margin: 8px 0 0; padding-left: 18px; }
+    .geom-hint { margin-top: 6px; font-size: 12px; color: #1d6c78; }
+    .geom-hint.warn { color: #b56c38; }
+    .verdict { border-radius: 8px; padding: 12px; border: 1px solid; }
+    .verdict.ok { background: #eaf6f3; border-color: #8fc4b4; }
+    .verdict.bad { background: #fdefed; border-color: #dda9a2; }
+    .verdict h3 { margin: 0 0 6px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #fff; }
+    .tag.ok { background: #1d6c78; } .tag.bad { background: #c0453a; } .tag.frozen { background: #6e7880; } .tag.warn { background: #b56c38; }
+    .reasons { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: #8f332c; }
+    .reasons li { margin: 2px 0; }
+    .pair-summary { margin-top: 8px; font-size: 12px; color: #5c7378; display: grid; gap: 2px; }
+    .line-list { display: grid; gap: 8px; max-height: 340px; overflow: auto; }
+    .line-item { border: 1px solid #d7e4e5; border-radius: 8px; padding: 9px 10px; cursor: pointer; }
+    .line-item.active { border-color: #1d6c78; background: #eef8f9; }
+    .line-item.frozen { cursor: default; }
+    .line-item.frozen.active { border-color: #6e7880; background: #f1f4f4; }
+    .line-item .row1 { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .mini { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid #c9dadc; color: #5c7378; }
+    .mini.bad { color: #fff; background: #c0453a; border-color: #c0453a; }
+    .mini.ok { color: #fff; background: #1d6c78; border-color: #1d6c78; }
+    .mini.warn { color: #fff; background: #b56c38; border-color: #b56c38; }
+    .result-item { border: 1px solid #d7e4e5; border-radius: 8px; padding: 9px 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .result-item.active { border-color: #6e7880; background: #f1f4f4; }
+    .snapshot-banner { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #eef1f2; border: 1px solid #b9c7c9; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
+    .toast { position: fixed; right: 18px; bottom: 18px; max-width: 380px; border-radius: 8px; padding: 12px 14px; color: #fff; font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.25); z-index: 50; }
+    .toast.ok { background: #1d6c78; } .toast.error { background: #a23b32; } .toast.info { background: #46606a; }
+    @media (max-width: 1020px) { .app { grid-template-columns: 1fr; } .map { max-width: 100%; } }
   </style>
 </head>
 <body>
   <header>
-    <div><h1>水下考古潜水记录</h1><div class="muted">点击沉船平面图添加标记，筛选、编辑并导出JSON。</div></div>
-    <button id="exportBtn">导出JSON</button>
+    <div>
+      <h1>水下考古测线重叠与拼图准入台</h1>
+      <div class="muted">每个潜次按测线编号唯一登记；相邻覆盖率须在 30%~50% 且航向交替，否则拼图只进待补测。</div>
+    </div>
+    <button id="exportBtn">导出当前成果 JSON</button>
   </header>
+
   <main class="app">
     <section class="panel">
-      <div class="map" id="map"><div class="wreck"></div></div>
-    </section>
-    <aside class="panel">
-      <div class="toolbar">
-        <select id="filter"><option value="">全部类型</option><option value="ceramic">陶片</option><option value="wood">木构件</option><option value="metal">金属件</option><option value="unknown">未知物</option></select>
-        <select id="view"><option value="list">标记列表</option><option value="timeline">潜次时间线</option></select>
+      <div class="maphead">
+        <div class="muted" id="mapHint">半透明条带为测宽覆盖，徽标为相邻测线覆盖率；点击测线选中编辑。</div>
+        <button id="armBtn">登记新测线（图上取起止点）</button>
       </div>
-      <form id="form">
-        <h2>标记信息</h2>
-        <input name="id" type="hidden">
-        <label>编号</label><input name="code" required>
-        <label>类型</label><select name="type"><option value="ceramic">陶片</option><option value="wood">木构件</option><option value="metal">金属件</option><option value="unknown">未知物</option></select>
-        <label>潜次</label><input name="dive" placeholder="例如DIVE-04" required>
-        <label>深度</label><input name="depth" placeholder="例如18.4m" required>
-        <label>朝向</label><input name="orientation" placeholder="例如东北偏北">
-        <label>保存状态</label><input name="condition" placeholder="例如表面附着贝类">
-        <label>备注</label><textarea name="note"></textarea>
-        <div class="toolbar"><button>保存标记</button><button type="button" id="deleteBtn" class="secondary">删除</button></div>
-      </form>
-      <h2 id="listTitle">标记列表</h2>
-      <div id="list" class="list"></div>
+      <div class="mapwrap">
+        <div class="map" id="map">
+          <div class="wreck"></div>
+          <div class="rib" style="left:28%"></div><div class="rib" style="left:35%"></div><div class="rib" style="left:42%"></div>
+          <div class="rib" style="left:49%"></div><div class="rib" style="left:56%"></div><div class="rib" style="left:63%"></div><div class="rib" style="left:70%"></div>
+        </div>
+      </div>
+      <div class="legend">
+        <span class="chip"><span class="swatch" style="background:rgba(126,196,202,.55)"></span>测宽条带（相邻对合格）</span>
+        <span class="chip"><span class="swatch" style="background:rgba(192,69,58,.5)"></span>相邻对不合格（覆盖率越界 / 未搭接）</span>
+        <span class="chip"><span class="mini ok">✓</span>覆盖率达标且航向交替</span>
+        <span class="chip"><span class="mini bad">低/高</span>低于三成 / 超过五成</span>
+        <span class="chip"><span class="mini warn">航向</span>航向未交替</span>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="snapshot-banner" id="snapshotBanner" hidden>
+        <span id="snapshotText"></span>
+        <button type="button" class="ghost" id="snapshotExit">返回当前数据</button>
+      </div>
+
+      <section>
+        <h2>拼图准入结论</h2>
+        <div id="statusCard"></div>
+      </section>
+
+      <section>
+        <h2>测线登记 / 修改</h2>
+        <form id="lineForm">
+          <fieldset id="formFields" style="border:0;margin:0;padding:0">
+            <input name="id" type="hidden">
+            <div class="grid2">
+              <div><label>测线编号（唯一）</label><input name="code" required placeholder="例如 L-01"></div>
+              <div><label>潜水员</label><input name="diver" required placeholder="姓名"></div>
+              <div><label>起点 X（米）</label><input name="sx" type="number" step="0.1" min="0" max="100" required></div>
+              <div><label>起点 Y（米）</label><input name="sy" type="number" step="0.1" min="0" max="100" required></div>
+              <div><label>终点 X（米）</label><input name="ex" type="number" step="0.1" min="0" max="100" required></div>
+              <div><label>终点 Y（米）</label><input name="ey" type="number" step="0.1" min="0" max="100" required></div>
+              <div><label>航向（度，0=北，顺时针）</label><input name="heading" type="number" step="0.1" min="0" max="360" required></div>
+              <div><label>测宽（米）</label><input name="width" type="number" step="0.1" min="0" max="60" required></div>
+              <div><label>拍照间隔（秒）</label><input name="interval" type="number" step="0.1" min="0" max="600" required></div>
+            </div>
+            <div class="geom-hint" id="geomHint"></div>
+            <ul class="form-errors" id="formErrors" hidden></ul>
+            <div class="form-actions">
+              <button id="saveBtn">提交登记</button>
+              <button type="button" class="secondary" id="newBtn">清空 / 新建</button>
+              <button type="button" class="danger" id="deleteBtn" hidden>删除测线</button>
+            </div>
+          </fieldset>
+        </form>
+      </section>
+
+      <section>
+        <h2>已通过成果版本（只读快照）</h2>
+        <div id="results"><div class="muted">尚无通过成果。</div></div>
+      </section>
+
+      <section>
+        <h2 id="listTitle">测线列表</h2>
+        <div id="lineList" class="line-list"></div>
+      </section>
     </aside>
   </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="js/rules.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/map.js"></script>
   <script>
-    const map = document.querySelector("#map");
-    const form = document.querySelector("#form");
-    const list = document.querySelector("#list");
-    const filter = document.querySelector("#filter");
-    const view = document.querySelector("#view");
-    const listTitle = document.querySelector("#listTitle");
-    const typeNames = { ceramic: "陶片", wood: "木构件", metal: "金属件", unknown: "未知物" };
-    let marks = JSON.parse(localStorage.getItem("zfl30Marks") || "[]");
-    let pending = null;
-    if (!marks.length) {
-      marks = [
-        { id: crypto.randomUUID(), code: "A-017", type: "ceramic", dive: "DIVE-01", x: 42, y: 46, depth: "17.8m", orientation: "东", condition: "边缘残缺", note: "靠近船肋" },
-        { id: crypto.randomUUID(), code: "W-003", type: "wood", dive: "DIVE-02", x: 58, y: 39, depth: "18.2m", orientation: "西北", condition: "稳定", note: "疑似横梁" }
-      ];
-      save();
-    }
-    for (let i = 0; i < 7; i++) {
-      const rib = document.createElement("div");
-      rib.className = "rib";
-      rib.style.left = 28 + i * 7 + "%";
-      map.appendChild(rib);
-    }
-    function save() { localStorage.setItem("zfl30Marks", JSON.stringify(marks)); }
-    function render() {
-      map.querySelectorAll(".marker").forEach(el => el.remove());
-      const filtered = filter.value ? marks.filter(m => m.type === filter.value) : marks;
-      filtered.forEach(mark => {
-        const el = document.createElement("button");
-        el.className = "marker " + mark.type + (mark.id === form.id.value ? " selected" : "");
-        el.style.left = mark.x + "%";
-        el.style.top = mark.y + "%";
-        el.textContent = mark.code.slice(0, 2);
-        el.onclick = event => { event.stopPropagation(); edit(mark.id); };
-        map.appendChild(el);
+    // —— 编排层：只做 DOM 事件与三个业务文件之间的接线 ——
+    (function () {
+      "use strict";
+
+      var mapEl = document.getElementById("map");
+      var form = document.getElementById("lineForm");
+      var fields = document.getElementById("formFields");
+      var formErrors = document.getElementById("formErrors");
+      var geomHint = document.getElementById("geomHint");
+      var armBtn = document.getElementById("armBtn");
+      var saveBtn = document.getElementById("saveBtn");
+      var newBtn = document.getElementById("newBtn");
+      var deleteBtn = document.getElementById("deleteBtn");
+      var exportBtn = document.getElementById("exportBtn");
+      var statusCard = document.getElementById("statusCard");
+      var resultsEl = document.getElementById("results");
+      var lineList = document.getElementById("lineList");
+      var listTitle = document.getElementById("listTitle");
+      var toastEl = document.getElementById("toast");
+      var snapshotBanner = document.getElementById("snapshotBanner");
+      var snapshotText = document.getElementById("snapshotText");
+      var snapshotExit = document.getElementById("snapshotExit");
+
+      var mode = "live";          // "live" 或 { result: 冻结成果 }
+      var selectedId = null;
+      var busy = false;
+      var toastTimer = null;
+
+      function toast(msg, kind) {
+        toastEl.textContent = msg;
+        toastEl.className = "toast " + (kind || "info");
+        toastEl.hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toastEl.hidden = true; }, 3200);
+      }
+
+      function fmtTime(iso) {
+        try { return new Date(iso).toLocaleString("zh-CN", { hour12: false }); }
+        catch (e) { return iso; }
+      }
+
+      function esc(s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      }
+
+      function currentView() {
+        if (mode === "live") {
+          var assessment = Store.getAssessment();
+          return {
+            live: true,
+            lines: Store.getLines(),
+            pairs: assessment.pairs,
+            eligible: assessment.eligible,
+            reasons: assessment.reasons,
+            fingerprint: assessment.fingerprint,
+            results: Store.getResults()
+          };
+        }
+        var r = mode.result;
+        var ev = Rules.evaluate(r.lines);
+        return {
+          live: false,
+          lines: r.lines,
+          pairs: ev.pairs,
+          eligible: ev.eligible,
+          reasons: ev.reasons,
+          fingerprint: r.fingerprint,
+          results: Store.getResults(),
+          result: r
+        };
+      }
+
+      function lineById(lines, id) {
+        return lines.filter(function (l) { return l.id === id; })[0] || null;
+      }
+
+      // ---------- 准入状态卡 ----------
+      function renderStatus(v) {
+        var matched = v.results.filter(function (r) { return r.fingerprint === v.fingerprint; })[0];
+        var html;
+        if (!v.live) {
+          html = '<div class="verdict ok"><h3><span class="tag frozen">只读快照</span>成果 V' + v.result.version + '</h3>' +
+            '<div class="muted">冻结于 ' + fmtTime(v.result.createdAt) + '。此为历史成果，不可编辑、不可再次导出。</div></div>';
+          statusCard.innerHTML = html;
+          return;
+        }
+        if (v.eligible && matched) {
+          html = '<div class="verdict ok"><h3><span class="tag ok">准入通过</span>当前数据 = 成果 V' + matched.version + '</h3>' +
+            '<div class="muted">生成于 ' + fmtTime(matched.createdAt) + '，可导出该冻结成果。</div>' + pairSummary(v.pairs) + '</div>' +
+            '<div class="form-actions"><button id="generateBtn" class="secondary">重新生成（沿用首次成果）</button></div>';
+        } else if (v.eligible) {
+          html = '<div class="verdict ok"><h3><span class="tag ok">准入通过</span>可生成拼图成果</h3>' +
+            '<div class="muted">数据较已通过成果已变更：确认后将按新数据生成新的成果版本，旧成果保持只读。</div>' + pairSummary(v.pairs) + '</div>' +
+            '<div class="form-actions"><button id="generateBtn">生成拼图成果</button></div>';
+        } else {
+          html = '<div class="verdict bad"><h3><span class="tag bad">待补测</span>禁止生成成果 / 导出</h3>' +
+            '<ul class="reasons">' + v.reasons.map(function (r) { return "<li>" + esc(r) + "</li>"; }).join("") + '</ul>' +
+            '<div class="muted" style="margin-top:6px">待补测不占用已通过成果版本号。</div></div>' +
+            '<div class="form-actions"><button disabled>待补测，禁止生成成果</button></div>';
+        }
+        statusCard.innerHTML = html;
+        var gb = document.getElementById("generateBtn");
+        if (gb) gb.onclick = onGenerate;
+      }
+
+      function pairSummary(pairs) {
+        if (!pairs.length) return '<div class="pair-summary muted">至少需要 2 条相邻测线。</div>';
+        return '<div class="pair-summary">' + pairs.map(function (p) {
+          var mark = p.ok ? '<span class="mini ok">达标</span>' : '<span class="mini bad">补测</span>';
+          return '<span>' + esc(p.aCode) + ' ↔ ' + esc(p.bCode) + '：覆盖率 ' +
+            p.coveragePct.toFixed(1) + '%，航向差 ' + p.headingGap.toFixed(0) + '° ' + mark + '</span>';
+        }).join("") + "</div>";
+      }
+
+      // ---------- 成果版本 ----------
+      function renderResults(v) {
+        if (!v.results.length) {
+          resultsEl.innerHTML = '<div class="muted">尚无通过成果。</div>';
+          return;
+        }
+        resultsEl.innerHTML = v.results.map(function (r) {
+          var active = !v.live && v.result.version === r.version;
+          var stale = v.live && r.fingerprint !== v.fingerprint;
+          return '<div class="result-item' + (active ? " active" : "") + '" data-version="' + r.version + '">' +
+            '<div><b>V' + r.version + '</b> <span class="muted">' + fmtTime(r.createdAt) + '</span>' +
+            '<div class="muted">' + r.lines.length + ' 条测线 · ' + r.pairs.length + ' 个相邻对' +
+            (stale ? ' · <span style="color:#b56c38">已被后续修改作旧（只读）</span>' : "") + '</div></div>' +
+            '<button type="button" class="ghost" data-view-version="' + r.version + '">只读查看</button></div>';
+        }).join("");
+        resultsEl.querySelectorAll("[data-view-version]").forEach(function (b) {
+          b.onclick = function () {
+            var ver = Number(b.getAttribute("data-view-version"));
+            var r = v.results.filter(function (x) { return x.version === ver; })[0];
+            if (r) enterSnapshot(r);
+          };
+        });
+      }
+
+      // ---------- 测线列表 ----------
+      function neighborInfo(lineId, pairs) {
+        return pairs.filter(function (p) { return p.aId === lineId || p.bId === lineId; }).map(function (p) {
+          var other = p.aId === lineId ? p.bCode : p.aCode;
+          var cls = p.ok ? "ok" : (p.coverageOk ? "warn" : "bad");
+          var label = p.ok ? p.coveragePct.toFixed(0) + "%" : (!p.alongOk ? "未搭接" : p.coveragePct.toFixed(0) + "%");
+          return '<span class="mini ' + cls + '">' + esc(other) + " " + label + (p.headingOk ? "" : " 航向") + "</span>";
+        }).join(" ");
+      }
+
+      function renderList(v) {
+        listTitle.textContent = v.live ? "测线列表（点击编辑）" : "快照测线（只读）";
+        if (!v.lines.length) {
+          lineList.innerHTML = '<div class="muted">暂无测线，先在图上登记。</div>';
+          return;
+        }
+        lineList.innerHTML = v.lines.map(function (l) {
+          return '<div class="line-item ' + (v.live ? "" : "frozen ") + (l.id === selectedId ? "active" : "") + '" data-id="' + l.id + '">' +
+            '<div class="row1"><b>' + esc(l.code) + '</b> ' + neighborInfo(l.id, v.pairs) + '</div>' +
+            '<div class="muted">' + esc(l.diver) + ' · (' + l.start.x + ',' + l.start.y + ') → (' + l.end.x + ',' + l.end.y + ')</div>' +
+            '<div class="muted">航向 ' + l.heading + '° · 测宽 ' + l.width + 'm · 间隔 ' + l.interval + 's' +
+            (l.updatedAt ? ' · 已修改重算' : '') + '</div></div>';
+        }).join("");
+        lineList.querySelectorAll("[data-id]").forEach(function (item) {
+          item.onclick = function () { selectLine(item.getAttribute("data-id")); };
+        });
+      }
+
+      // ---------- 表单 ----------
+      function formValues() {
+        var f = new FormData(form);
+        return {
+          id: f.get("id"), code: f.get("code"), diver: f.get("diver"),
+          sx: f.get("sx"), sy: f.get("sy"), ex: f.get("ex"), ey: f.get("ey"),
+          heading: f.get("heading"), width: f.get("width"), interval: f.get("interval")
+        };
+      }
+
+      function fillForm(l) {
+        form.elements.id.value = l.id;
+        form.elements.code.value = l.code;
+        form.elements.diver.value = l.diver;
+        form.elements.sx.value = l.start.x; form.elements.sy.value = l.start.y;
+        form.elements.ex.value = l.end.x; form.elements.ey.value = l.end.y;
+        form.elements.heading.value = l.heading;
+        form.elements.width.value = l.width;
+        form.elements.interval.value = l.interval;
+        deleteBtn.hidden = false;
+        saveBtn.textContent = "保存修改";
+        updateGeomHint();
+      }
+
+      function resetForm(prefill) {
+        form.reset();
+        form.elements.id.value = "";
+        if (prefill) {
+          form.elements.code.value = prefill.code || Rules.suggestCode(Store.getLines());
+          if (prefill.start && prefill.end) {
+            form.elements.sx.value = prefill.start.x; form.elements.sy.value = prefill.start.y;
+            form.elements.ex.value = prefill.end.x; form.elements.ey.value = prefill.end.y;
+          }
+          if (prefill.heading !== undefined) form.elements.heading.value = prefill.heading;
+          form.elements.width.value = prefill.width;
+          form.elements.interval.value = prefill.interval;
+          if (prefill.diver) form.elements.diver.value = prefill.diver;
+        }
+        deleteBtn.hidden = true;
+        saveBtn.textContent = "提交登记";
+        formErrors.hidden = true;
+        updateGeomHint();
+      }
+
+      function selectLine(id) {
+        selectedId = id;
+        var v = currentView();
+        var l = id ? lineById(v.lines, id) : null;
+        if (l) fillForm(l); else resetForm();
+        renderAll();
+      }
+
+      function updateGeomHint() {
+        var raw = formValues();
+        var nums = ["sx", "sy", "ex", "ey"].map(function (k) { return Number(raw[k]); });
+        geomHint.className = "geom-hint";
+        if (nums.some(function (n) { return !isFinite(n); })) { geomHint.textContent = ""; return; }
+        var b = Rules.bearing({ x: nums[0], y: nums[1] }, { x: nums[2], y: nums[3] });
+        var h = Number(raw.heading);
+        var base = "按起止点推算航向 " + b.toFixed(1) + "°";
+        if (isFinite(h)) {
+          var d = Rules.angleDiff(b, h);
+          if (d > Rules.LIMITS.HEADING_TOLERANCE) {
+            geomHint.className = "geom-hint warn";
+            geomHint.textContent = base + "，与登记航向 " + h + "° 差 " + d.toFixed(0) + "°，相邻航向交替按登记航向判定，请确认。";
+            return;
+          }
+        }
+        geomHint.textContent = base + "，可据此填写登记航向。";
+      }
+
+      ["sx", "sy", "ex", "ey", "heading"].forEach(function (name) {
+        form.elements[name].addEventListener("input", updateGeomHint);
       });
-      if (view.value === "timeline") renderTimeline(filtered);
-      else renderList(filtered);
-    }
-    function renderList(data) {
-      listTitle.textContent = "标记列表";
-      list.className = "list";
-      list.innerHTML = data.map(m => '<div class="item '+(m.id===form.id.value?'active':'')+'" data-id="'+m.id+'"><b>'+m.code+'</b> <span class="pill">'+typeNames[m.type]+'</span><div class="muted">'+m.dive+' · '+m.depth+' · '+m.orientation+'</div><div>'+m.condition+'</div></div>').join("");
-      list.querySelectorAll("[data-id]").forEach(el => el.onclick = () => edit(el.dataset.id));
-    }
-    function renderTimeline(data) {
-      listTitle.textContent = "潜次时间线";
-      list.className = "timeline";
-      const groups = data.reduce((map, item) => ((map[item.dive] ||= []).push(item), map), {});
-      list.innerHTML = Object.entries(groups).map(([dive, items]) => '<div class="item"><b>'+dive+'</b><div class="muted">新增'+items.length+'个标记</div>'+items.map(i => '<div>'+i.code+' · '+typeNames[i.type]+'</div>').join("")+'</div>').join("");
-    }
-    function edit(id) {
-      const mark = marks.find(m => m.id === id);
-      if (!mark) return;
-      for (const [key, value] of Object.entries(mark)) if (form[key]) form[key].value = value;
-      pending = { x: mark.x, y: mark.y };
-      render();
-    }
-    map.addEventListener("click", event => {
-      const rect = map.getBoundingClientRect();
-      pending = { x: Number(((event.clientX - rect.left) / rect.width * 100).toFixed(2)), y: Number(((event.clientY - rect.top) / rect.height * 100).toFixed(2)) };
-      form.reset();
-      form.id.value = "";
-      form.code.value = "M-" + String(marks.length + 1).padStart(3, "0");
-      form.dive.value = "DIVE-01";
-      render();
-    });
-    form.onsubmit = event => {
-      event.preventDefault();
-      if (!pending) pending = { x: 50, y: 50 };
-      const data = Object.fromEntries(new FormData(form).entries());
-      if (data.id) Object.assign(marks.find(m => m.id === data.id), data, pending);
-      else marks.push({ ...data, id: crypto.randomUUID(), ...pending });
-      save(); render();
-    };
-    document.querySelector("#deleteBtn").onclick = () => {
-      if (!form.id.value) return;
-      marks = marks.filter(m => m.id !== form.id.value);
-      form.reset(); pending = null; save(); render();
-    };
-    document.querySelector("#exportBtn").onclick = () => {
-      const blob = new Blob([JSON.stringify(marks, null, 2)], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob); a.download = "dive-marks.json"; a.click(); URL.revokeObjectURL(a.href);
-    };
-    filter.onchange = render; view.onchange = render;
-    render();
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        if (mode !== "live") { toast("正在查看只读成果快照，请先返回当前数据。", "error"); return; }
+        if (busy) { toast("提交处理中，请勿重复点击。", "info"); return; }
+
+        var raw = formValues();
+        var check = Rules.validateLine(raw, Store.getLines(), raw.id || null);
+        if (check.errors.length) {
+          formErrors.innerHTML = check.errors.map(function (m) { return "<li>" + esc(m) + "</li>"; }).join("");
+          formErrors.hidden = false;
+          toast("登记信息校验未通过", "error");
+          return;
+        }
+        formErrors.hidden = true;
+        busy = true; saveBtn.disabled = true;
+        var payload = check.value;
+        if (raw.id) payload.id = raw.id; // 修改已有测线
+        Store.submitLine(payload).then(function (outcome) {
+          busy = false; saveBtn.disabled = false;
+          selectedId = outcome.line.id;
+          if (outcome.status === "deduplicated") {
+            toast("重复/并发提交：沿用首次结果（" + outcome.line.code + "）。", "info");
+          } else if (raw.id) {
+            toast(outcome.line.code + " 已修改，相关拼图立即失效并按新数据重算；旧成果只读。", "ok");
+          } else {
+            toast(outcome.line.code + " 登记成功，准入结论已重算。", "ok");
+          }
+          if (MapView.isArmed()) MapView.disarm();
+          syncArmButton();
+          renderAll();
+          fillForm(outcome.line);
+        });
+      });
+
+      newBtn.onclick = function () {
+        if (mode !== "live") return;
+        selectedId = null;
+        if (MapView.isArmed()) MapView.disarm();
+        syncArmButton();
+        resetForm({
+          code: Rules.suggestCode(Store.getLines()),
+          width: 10, interval: 4
+        });
+        renderAll();
+      };
+
+      deleteBtn.onclick = function () {
+        if (mode !== "live" || !form.elements.id.value) return;
+        var code = form.elements.code.value;
+        if (!confirm("确认删除测线 " + code + "？相关拼图结论将按剩余测线重算（已通过的只读成果不受影响）。")) return;
+        Store.deleteLine(form.elements.id.value);
+        selectedId = null;
+        resetForm();
+        toast("测线 " + code + " 已删除，拼图结论已重算。", "ok");
+        renderAll();
+      };
+
+      // ---------- 地图取点 ----------
+      function syncArmButton() {
+        var armed = MapView.isArmed();
+        armBtn.textContent = armed ? "取消取点" : "登记新测线（图上取起止点）";
+        armBtn.className = armed ? "danger" : "";
+      }
+
+      armBtn.onclick = function () {
+        if (mode !== "live") { toast("只读快照视图不能登记测线。", "error"); return; }
+        if (MapView.isArmed()) { MapView.disarm(); } else {
+          selectedId = null;
+          resetForm({ code: Rules.suggestCode(Store.getLines()), width: 10, interval: 4 });
+          MapView.arm();
+        }
+        syncArmButton();
+        renderAll();
+      };
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && MapView.isArmed()) { MapView.disarm(); syncArmButton(); }
+      });
+
+      // ---------- 成果生成 / 快照 / 导出 ----------
+      function onGenerate() {
+        if (busy) { toast("生成处理中，重复提交沿用首次结果。", "info"); return; }
+        busy = true;
+        Store.generateResult().then(function (outcome) {
+          busy = false;
+          if (outcome.status === "approved") {
+            toast("拼图成果 V" + outcome.result.version + " 已生成（冻结快照）。", "ok");
+          } else if (outcome.status === "deduplicated") {
+            toast("当前数据的成果已存在，沿用首次生成的 V" + outcome.result.version + "。", "info");
+          } else {
+            toast("准入未通过：拼图只进入待补测，未生成成果、不占用版本号。", "error");
+          }
+          renderAll();
+        });
+      }
+
+      function enterSnapshot(result) {
+        mode = { result: result };
+        selectedId = null;
+        if (MapView.isArmed()) MapView.disarm();
+        syncArmButton();
+        snapshotBanner.hidden = false;
+        snapshotText.textContent = "只读查看成果 V" + result.version + "（" + fmtTime(result.createdAt) + "）：显示的是冻结时的测线数据。";
+        fields.disabled = true;
+        armBtn.disabled = true;
+        deleteBtn.hidden = true;
+        resetForm();
+        renderAll();
+      }
+
+      function exitSnapshot() {
+        mode = "live";
+        selectedId = null;
+        snapshotBanner.hidden = true;
+        fields.disabled = false;
+        armBtn.disabled = false;
+        resetForm();
+        renderAll();
+      }
+      snapshotExit.onclick = exitSnapshot;
+
+      exportBtn.onclick = function () {
+        if (mode !== "live") { toast("只读快照不能再次导出，请返回当前数据。", "error"); return; }
+        var v = currentView();
+        if (!v.eligible) { toast("拼图处于待补测，禁止导出成果。", "error"); return; }
+        var matched = v.results.filter(function (r) { return r.fingerprint === v.fingerprint; })[0];
+        if (!matched) { toast("当前数据尚未生成成果，请先生成；待补测数据不能导出。", "error"); return; }
+        var blob = new Blob([JSON.stringify(matched, null, 2)], { type: "application/json" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "mosaic-result-v" + matched.version + ".json";
+        a.click();
+        URL.revokeObjectURL(a.href);
+        toast("已导出成果 V" + matched.version + " 冻结快照。", "ok");
+      };
+
+      // ---------- 统一渲染：列表 / 测线图 / 准入结论同源，刷新后一致 ----------
+      function renderAll() {
+        var v = currentView();
+        MapView.render({ lines: v.lines, pairs: v.pairs, selectedId: selectedId });
+        renderStatus(v);
+        renderResults(v);
+        renderList(v);
+        var matched = v.results.some(function (r) { return r.fingerprint === v.fingerprint; });
+        exportBtn.disabled = !(v.live && v.eligible && matched);
+      }
+
+      Store.init();
+      MapView.init(mapEl, {
+        onSelect: function (id) {
+          if (mode !== "live" && id) {
+            selectedId = id;
+            var l = lineById(mode.result.lines, id);
+            if (l) { fillForm(l); deleteBtn.hidden = true; }
+            renderAll();
+            return;
+          }
+          selectLine(id);
+        },
+        onPickLine: function (start, end) {
+          if (mode !== "live") return;
+          selectedId = null;
+          resetForm({
+            code: Rules.suggestCode(Store.getLines()),
+            start: start, end: end,
+            heading: Rules.round(Rules.bearing(start, end), 1),
+            width: 10, interval: 4
+          });
+          syncArmButton();
+          renderAll();
+          toast("已在图上取起止点，补全潜水员后提交；重复编号或并发提交会沿用首次结果。", "info");
+        },
+        onArmedChange: syncArmButton
+      });
+
+      resetForm({ code: Rules.suggestCode(Store.getLines()), width: 10, interval: 4 });
+      renderAll();
+    })();
   </script>
 </body>
 </html>
